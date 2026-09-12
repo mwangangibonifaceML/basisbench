@@ -3,6 +3,14 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+#IDE
+.vscode/
+.idea/
+
+# Data
+data/raw/
+data/processed/
+
 # C extensions
 *.so
 
