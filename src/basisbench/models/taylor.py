@@ -27,10 +27,7 @@ class Taylor(nn.Module):
             raise ValueError(
                 f'X must be a 1D tensor, got shape {tuple(x.shape)}'
             )
-        powers = []
-        for d in range(self.degree + 1):
-            powers.append(x ** d)
-        matrix = torch.column_stack(powers)
+        matrix = torch.vander(x, N=self.degree + 1, increasing=True)
         return matrix
     
     def forward(self, X: torch.Tensor) -> torch.Tensor:
