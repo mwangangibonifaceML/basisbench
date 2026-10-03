@@ -26,9 +26,11 @@ class TimeScaler:
     
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--train", type=Path, default=Path("data/proccessed/train_set.csv"))
-    parser.add_argument("--validation", type=Path, default=Path("data/proccessed/val_set.csv"))
-    parser.add_argument("--test", type=Path, default=Path("data/proccessed/test_set.csv"))
+    parser.add_argument("--input-path", type=Path, default=Path("C:\\Users\\User\\Desktop\\basisbench\\data\\raw\\hour.csv"))
+    parser.add_argument("--output-path", type=Path, default=Path("C:\\Users\\User\\Desktop\\basisbench\\data\\processed"))
+    parser.add_argument("--train", type=Path, default=Path("C:\\Users\\User\\Desktop\\basisbench\\data\\processed\\train_set.csv"))
+    parser.add_argument("--validation", type=Path, default=Path("C:\\Users\\User\\Desktop\\basisbench\\data\\processed\\val_set.csv"))
+    parser.add_argument("--test", type=Path, default=Path("C:\\Users\\User\\Desktop\\basisbench\\data\\processed\\test_set.csv"))
     parser.add_argument(
         "--time-column",
         default=None,
@@ -37,98 +39,54 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-column", default="cnt")
     parser.add_argument("--degree", type=int, default=5)
     parser.add_argument("--max-frequency", type=int, default=5)
-    parser.add_argument('-hidden-size', type=int, default=10)
-    parser.add_argument("--epochs", type=int, default=500)
+    parser.add_argument('--hidden-size', type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--patience", type=int, default=50)
     parser.add_argument("--learning-rate", type=float, default=1e-2)
     parser.add_argument("--weight-decay", type=float, default=1e-6)
     parser.add_argument("--gradient-clip", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=Path("artifacts/taylor"))
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--optimizer", type=str, default="adamw", choices=["adamw", "sgd", "adam"])
     return parser.parse_args()
-
-def choose_time_column(frame: pd.DataFrame, requested: str | None) -> str:
-    if requested is not None:
-        if requested not in frame.columns:
-            raise ValueError(f"time column {requested!r} is not present in the CSV")
-        return requested
-
-    for candidate in ("timenormalized", "instant"):
-        if candidate in frame.columns:
-            return candidate
-
-    raise ValueError(
-        "could not find a time column; pass --time-column with a numeric column "
-        "such as 'instant'"
-    )
-
-def numeric_column(frame: pd.DataFrame, column: str, split_name: str) -> np.ndarray:
-    if column not in frame.columns:
-        raise ValueError(f"{column!r} is missing from the {split_name} CSV")
-    values = pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=np.float64)
-    if not np.isfinite(values).all():
-        raise ValueError(f"{column!r} contains missing or non-numeric values in {split_name}")
-    return values
-
-def make_tensors(
-    frame: pd.DataFrame,
-    split_name: str,
-    time_column: str,
-    target_column: str,
-    scaler: TimeScaler,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    time = scaler.transform(numeric_column(frame, time_column, split_name))
-    target = numeric_column(frame, target_column, split_name)
-    if (target < 0).any():
-        raise ValueError("cnt must be non-negative when using the log1p target transform")
-
-    #* log1p reduces the effect of the highly skewed bike-count target.
-    return (
-        torch.from_numpy(time.astype(np.float32)),
-        torch.from_numpy(np.log1p(target).astype(np.float32)),
-    )
 
 def evaluate(
     model: nn.Module,
-    x: torch.Tensor,
-    y_log: torch.Tensor,
+    dataloader: torch.utils.data.DataLoader,
+    loss_fn: nn.Module
 ) -> tuple[float, float, float, float]:
-
     model.eval()
-
+    
+    num_samples = 0
+    total_absolute_error = 0.0
+    total_mean_squared_error = 0.0
+    total_root_mean_squared_error = 0.0
+    total_log_sqared_error = 0.0
+    
     with torch.no_grad():
-        prediction_log = model(x)
+        for x, y_log in dataloader:
+            prediction_log = model(x)
 
-        mse_log = nn.functional.mse_loss(
-            prediction_log,
-            y_log
-        ).item()
+            prediction = torch.expm1(prediction_log).clamp_min(0.0)
+            actual = torch.expm1(y_log)
+            
+            total_absolute_error += torch.sum(torch.abs(prediction - actual)).item()
+            total_mean_squared_error += torch.sum((prediction - actual) ** 2).item()
+            total_root_mean_squared_error += torch.sum((prediction - actual) ** 2).item()
+            total_log_sqared_error += torch.sum((prediction_log - y_log) ** 2).item()
+            # total_loss += loss_fn(prediction_log, y_log).item() * x.size(0)
+            num_samples += x.size(0)    
+            
+    mse_log = total_log_sqared_error / num_samples
+    mae = total_absolute_error / num_samples
+    mse = total_mean_squared_error / num_samples
+    rmse = torch.sqrt(torch.tensor(total_root_mean_squared_error / num_samples)).item()
 
-        prediction = torch.expm1(prediction_log).clamp_min(0.0)
-        actual = torch.expm1(y_log)
+    return mse_log,mse, rmse, mae
 
-        mae = torch.mean(
-            torch.abs(prediction - actual)
-        ).item()
-
-        mse = torch.mean(
-            (prediction - actual) ** 2
-        ).item()
-
-        rmse = torch.sqrt(
-            torch.mean((prediction - actual) ** 2)
-        ).item()
-
-    return mse_log, mae, rmse, mse
-
-def load_data():
-    args = parse_args()
+def load_data(args) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train_df = pd.read_csv(args.train)
     val_df = pd.read_csv(args.validation)
     test_df = pd.read_csv(args.test)
-    
-    return (
-        train_df,
-        val_df,
-        test_df
-    )
+    return train_df, val_df, test_df
