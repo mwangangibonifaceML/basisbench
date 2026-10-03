@@ -19,11 +19,12 @@ class Fourier(nn.Module):
         self.bias = nn.Parameter(torch.empty(1, dtype=torch.float32))
         
         #* initialize the parameters
-        nn.init.uniform_(self.cos_coefficients, -0.001, 0.001)
-        nn.init.uniform_(self.sin_coefficients, -0.001, 0.001)
-        nn.init.uniform_(self.bias, -0.001, 0.001)
+        nn.init.uniform_(self.cos_coefficients, -0.1, 0.1)
+        nn.init.uniform_(self.sin_coefficients, -0.1, 0.1)
+        nn.init.uniform_(self.bias, -0.1, 0.1)
         
     def forward(self, X: torch.Tensor) -> torch.Tensor:
+        self.bias.data.fill_(X.mean())  # Set the bias term to the mean of X
         output = self.bias
         
         for k in range(1,self.max_frequency+1):
@@ -34,16 +35,3 @@ class Fourier(nn.Module):
                 start= output
             )
         return output
-        
-        
-if __name__ == '__main__':
-    f = 3
-    x = [i/10 for i in range(10)]
-    
-    x = torch.tensor([ix for ix in x], dtype=torch.float32)
-    angles = f*x
-    y = torch.cos(angles) + torch.sin(angles)
-    
-    model = Fourier(max_frequency=f)
-    output = model(x)
-    print(output)
