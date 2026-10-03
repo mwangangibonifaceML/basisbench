@@ -1,0 +1,25 @@
+[project]
+name = "basisbench"
+version = "0.1.0"
+description = "Comparing polynomial, Fourier, and neural representations for time-series forecasting"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "sk>=0.0.1",
+    "learn>=1.0.0",
+    "torch>=2.14.0",
+    "pytest>=9.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
