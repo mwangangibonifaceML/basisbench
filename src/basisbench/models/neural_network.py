@@ -20,10 +20,10 @@ class NeuralNetwork(nn.Module):
         self.b2 = nn.Parameter(torch.empty(1))
         
         #* initialize the parameters
-        nn.init.uniform_(self.w1, -0.001, 0.001)
-        nn.init.uniform_(self.b1, -0.001, 0.001)
-        nn.init.uniform_(self.w2, -0.001, 0.001)
-        nn.init.uniform_(self.b2, -0.001, 0.001)
+        nn.init.uniform_(self.w1, -0.1, 0.1)
+        nn.init.uniform_(self.b1, -0.1, 0.1)
+        nn.init.uniform_(self.w2, -0.1, 0.1)
+        nn.init.uniform_(self.b2, -0.1, 0.1)
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the network."""
@@ -31,6 +31,7 @@ class NeuralNetwork(nn.Module):
             raise ValueError(
                 'Input must be 1-D tensor of shape (N,)'
             )
+        self.b1.data.fill_(x.mean())  # Set the bias term to the mean of x
         z = x[:, None] * self.w1 + self.b1
         h = torch.tanh(z)
         return h @ self.w2 + self.b2
