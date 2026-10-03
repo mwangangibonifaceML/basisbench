@@ -47,11 +47,6 @@ def main() -> None:
     x_train, y_train = make_tensors(train_df, "training", time_column, args.target_column, scaler)
     x_val, y_val = make_tensors(val_df, "validation", time_column, args.target_column, scaler)
     x_test, y_test = make_tensors(test_df, "test", time_column, args.target_column, scaler)
-
-    x_val = 2.0 * (x_val - x_val.min()) / (x_val.max() - x_val.min()) - 1
-    y_val = 2.0 * (y_val - y_val.min()) / (y_val.max() - y_val.min()) - 1
-    x_test = 2.0 * (x_test - x_test.min()) / (x_test.max() - x_test.min()) - 1
-    y_test = 2.0 * (y_test - y_test.min()) / (y_test.max() - y_test.min()) - 1
     
     model = Taylor(degree=args.degree)
     with torch.no_grad():
