@@ -20,7 +20,7 @@ class Taylor(nn.Module):
         self.degree = degree
         self.coefficients = nn.Parameter(torch.empty(degree + 1))
 
-        nn.init.uniform_(self.coefficients, -0.001, 0.001)
+        nn.init.uniform_(self.coefficients, -0.1, 0.1)
 
     def _design_matrix(self, x: torch.Tensor) -> torch.Tensor:
         if x.ndim != 1:
@@ -31,6 +31,8 @@ class Taylor(nn.Module):
         return matrix
     
     def forward(self, X: torch.Tensor) -> torch.Tensor:
+        self.coefficients[0].data.fill_(X.mean())  # Set the intercept term to the mean of X
+        
         matrix = self._design_matrix(X)
         return matrix @ self.coefficients
     
